@@ -1,0 +1,13 @@
+<launch>
+
+        <node pkg="linetracing" type="move_agv.py" name="move_agv" output="screen"/>
+
+        <node pkg="linetracing" type="publish_image.py" name="publish_image" />
+        <node pkg="linetracing" type="publish_direction.py" name="publish_direction"/>
+        <node pkg="linetracing" type="publish_stopsign.py" name="publish_stopsign"/>
+
+        <node pkg="linetracing" type="detect_front_obstacle.py" name="detect_front_obstacle"/>
+
+	<include file="$(find ydlidar_ros_driver)/launch/X2.launch" />
+
+</launch>
