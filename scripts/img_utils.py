@@ -4,7 +4,6 @@ import numpy as np
 import torch
 
 from models.experimental import attempt_load
-#from utils.general import non_max_suppression, scale_coords
 from utils.general import non_max_suppression, scale_coords
 
 def get_direction(frame):
@@ -17,11 +16,11 @@ def get_direction(frame):
 
     hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
     
-    lower_black = np.array([30, 100, 100], dtype=np.uint8)
-    upper_black = np.array([40, 255, 255], dtype=np.uint8)
-    black_mask = cv2.inRange(hsv, lower_black, upper_black)
+    lower_yellow = np.array([30, 100, 100], dtype=np.uint8)
+    upper_yellow = np.array([40, 255, 255], dtype=np.uint8)
+    mask = cv2.inRange(hsv, lower_yellow, upper_yellow)
 
-    contours, _ = cv2.findContours(black_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
     if len(contours) >= 1:
         max_contour = max(contours, key=cv2.contourArea)
@@ -61,7 +60,7 @@ class TrafficInfo:
 
     def get_go_stop_yolov7(self, frame):
 
-        def frame_to_tensor(self, frame):
+        def frame_to_tensor(frame):
             img = torch.from_numpy(frame).to(self.device)
             img = img.float()  # uint8 to fp16/32
             img /= 255.0  # 0 - 255 to 0.0 - 1.0
@@ -70,7 +69,8 @@ class TrafficInfo:
             return img
 
         ret = False
-        img = self.frame_to_tensor(frame)
+
+        img = frame_to_tensor(frame)
 
         with torch.no_grad():
             pred = self.model(img, augment=False)[0]
@@ -90,47 +90,27 @@ class TrafficInfo:
         return ret
 
     def get_go_stop_cv2(self, frame):
+
         ret = False
 
-        lower_red = np.array([0, 120, 120])
-        upper_red = np.array([5, 255, 255])
-        lower_green = np.array([50, 100, 100])
-        upper_green = np.array([70, 255, 255])
-        #lower_yellow = np.array([30, 130, 140])
-        #upper_yellow = np.array([35, 255, 255])
-
-        def draw_bounding_box(contours, color):
-            for contour in contours:
-                x, y, w, h = cv2.boundingRect(contour)
-                min_size = 80
-                if w >= min_size and h >= min_size:
-                    cv2.rectangle(frame, (x, y), (x + w, y + h), color, 2)
-
+        threshold = {'red': [np.array([0, 120, 120]), np.array([5, 255, 255])],
+                     'green': [np.array([50, 100, 100]), np.array([70, 255, 255])]}
+        
         hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
 
-        mask_red = cv2.inRange(hsv, lower_red, upper_red) 
-        mask_green = cv2.inRange(hsv, lower_green, upper_green)  
-        #mask_yellow = cv2.inRange(hsv, lower_yellow, upper_yellow)
+        masks = list()
+        for k, v in threshold.items():
+            masks.append(cv2.inRange(hsv, v[0], v[1]))
 
-        contours_red, _ = cv2.findContours(mask_red, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        contours_green, _ = cv2.findContours(mask_green, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        #contours_yellow, _ = cv2.findContours(mask_yellow, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        contours = list()
+        for mask in masks:
+            contours.append(cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE))
 
-        if len(contours_red) >= 1:
-            max_contour_red = max(contours_red, key=cv2.contourArea)
-            #draw_bounding_box([max_contour_red], (0, 255, 255))
-            ret = True
-            
+        for i, (contour, _) in enumerate(contours):
+            if len(contour) > 0 and i == 0:
+                ret = True
 
-        if len(contours_green) >= 1:
-            max_contour_green = max(contours_green, key=cv2.contourArea)
-            #draw_bounding_box([max_contour_green], (255, 255, 0))
-            ret = False
-
-
-        #if len(contours_yellow) >= 1:
-        #    max_contour_yellow = max(contours_yellow, key=cv2.contourArea)
-        #    draw_bounding_box([max_contour_yellow], (255, 0, 255))
-      
+            else:
+                ret = False
 
         return ret
